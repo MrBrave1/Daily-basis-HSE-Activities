@@ -1,0 +1,584 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Download, Upload, Lock, Unlock, Plus, Trash2, X, FileUp } from 'lucide-react';
+import * as XLSX from 'xlsx';
+
+const ContractorReportForm = () => {
+  const fileInputRef = useRef(null);
+  const [contractorLogo, setContractorLogo] = useState(null);
+  const [thirdPartyLogo, setThirdPartyLogo] = useState(null);
+  const [principalLogo, setPrincipalLogo] = useState(null);
+  const [logosLocked, setLogosLocked] = useState(false);
+  
+  const [projectName, setProjectName] = useState('');
+  const [summary, setSummary] = useState('');
+  const [changeableDate, setChangeableDate] = useState('');
+  
+  const [rows, setRows] = useState([
+    { id: 1, date: '', name: '', subContractor: '', photo: null, sign: null, remarks: '' }
+  ]);
+  
+  const [hseOfficer, setHseOfficer] = useState('');
+  const [hsePhoto, setHsePhoto] = useState(null);
+  const [hseSignature, setHseSignature] = useState(null);
+
+  // Load saved logos and lock state on mount
+  useEffect(() => {
+    loadSavedData();
+  }, []);
+
+  const loadSavedData = async () => {
+    try {
+      const logoData = await window.storage.get('contractor-logos');
+      if (logoData) {
+        const data = JSON.parse(logoData.value);
+        setContractorLogo(data.contractor);
+        setThirdPartyLogo(data.thirdParty);
+        setPrincipalLogo(data.principal);
+        setLogosLocked(data.locked || false);
+      }
+    } catch (error) {
+      console.log('No saved logos found');
+    }
+  };
+
+  const saveLockState = async (locked, contractor, thirdParty, principal) => {
+    try {
+      await window.storage.set('contractor-logos', JSON.stringify({
+        contractor: contractor || contractorLogo,
+        thirdParty: thirdParty || thirdPartyLogo,
+        principal: principal || principalLogo,
+        locked
+      }));
+    } catch (error) {
+      console.error('Failed to save logos:', error);
+    }
+  };
+
+  const handleLogoUpload = (e, setLogo) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setLogo(event.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const toggleLockLogos = () => {
+    const newLockState = !logosLocked;
+    setLogosLocked(newLockState);
+    saveLockState(newLockState);
+  };
+
+  const addRow = () => {
+    const newId = Math.max(...rows.map(r => r.id), 0) + 1;
+    setRows([...rows, { 
+      id: newId, 
+      date: '', 
+      name: '', 
+      subContractor: '', 
+      photo: null, 
+      sign: null, 
+      remarks: '' 
+    }]);
+  };
+
+  const deleteRow = (id) => {
+    if (rows.length > 1) {
+      setRows(rows.filter(row => row.id !== id));
+    }
+  };
+
+  const updateRow = (id, field, value) => {
+    setRows(rows.map(row => 
+      row.id === id ? { ...row, [field]: value } : row
+    ));
+  };
+
+  const handleFileUpload = (id, field, e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        updateRow(id, field, event.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const exportToPDF = () => {
+    window.print();
+  };
+
+  const exportToExcel = () => {
+    const data = [
+      ['Contractor Logo', 'Third Party Company Logo', '', 'Principal Employer Logo'],
+      ['', 'Project Name', '', ''],
+      ['', projectName, '', ''],
+      ['', summary.toUpperCase(), '', ''],
+      ['Date', changeableDate, '', ''],
+      [],
+      ['Date', 'Name', 'Sub Contractor', 'Photo', 'Sign', 'Remarks']
+    ];
+
+    rows.forEach(row => {
+      data.push([
+        row.date,
+        row.name,
+        row.subContractor,
+        row.photo ? 'Photo Attached' : '',
+        row.sign ? 'Sign Attached' : '',
+        row.remarks
+      ]);
+    });
+    
+    data.push([]);
+    data.push(['HSE Officer Name', hseOfficer, 'Photo', hsePhoto ? 'Photo Attached' : '', 'Signature', hseSignature ? 'Signature Attached' : '']);
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Contractor Report');
+    
+    ws['!cols'] = [
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 20 }
+    ];
+
+    XLSX.writeFile(wb, 'contractor_report.xlsx');
+  };
+
+  const importFromExcel = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        // Parse data rows only (starting from row index 7)
+        const newRows = [];
+        let rowId = 1;
+        
+        for (let i = 7; i < jsonData.length; i++) {
+          const row = jsonData[i];
+          
+          // Check if this is the HSE Officer row - stop here
+          if (row[0] === 'HSE Officer Name') {
+            break;
+          }
+          
+          // Skip empty rows
+          if (!row || row.every(cell => !cell)) continue;
+          
+          newRows.push({
+            id: rowId++,
+            date: row[0] || '',
+            name: row[1] || '',
+            subContractor: row[2] || '',
+            photo: null,
+            sign: null,
+            remarks: row[5] || ''
+          });
+        }
+
+        if (newRows.length > 0) {
+          setRows(newRows);
+          alert(`Successfully imported ${newRows.length} row(s) from Excel.`);
+        } else {
+          alert('No data rows found in the Excel file.');
+        }
+      } catch (error) {
+        console.error('Error importing Excel:', error);
+        alert('Error importing Excel file. Please make sure the format is correct.');
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          #printable-area, #printable-area * { visibility: visible; }
+          #printable-area { position: absolute; left: 0; top: 0; width: 100%; }
+          .no-print { display: none !important; }
+        }
+      `}</style>
+      
+      <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg p-6">
+        <div className="flex justify-between items-center mb-6 no-print">
+          <h1 className="text-3xl font-bold text-gray-800">Contractor Report Manager</h1>
+          <div className="flex gap-2">
+            <button
+              onClick={toggleLockLogos}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              {logosLocked ? <Lock size={18} /> : <Unlock size={18} />}
+              {logosLocked ? 'Unlock Logos' : 'Lock Logos'}
+            </button>
+            <label className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 cursor-pointer">
+              <FileUp size={18} />
+              Import Excel
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={importFromExcel}
+                className="hidden"
+              />
+            </label>
+            <button
+              onClick={exportToExcel}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              <Download size={18} />
+              Excel
+            </button>
+            <button
+              onClick={exportToPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              <Download size={18} />
+              PDF
+            </button>
+          </div>
+        </div>
+
+        <div id="printable-area">
+          {/* Logo Section */}
+          <div className="grid grid-cols-4 gap-4 mb-6 border-2 border-gray-800">
+            <div className="border-r-2 border-gray-800 p-4 flex flex-col items-center justify-center min-h-32">
+              <div className="text-sm font-semibold mb-2">Contractor Logo</div>
+              {contractorLogo ? (
+                <div className="relative">
+                  <img src={contractorLogo} alt="Contractor" className="h-20 object-contain" />
+                  {!logosLocked && (
+                    <button
+                      onClick={() => setContractorLogo(null)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 no-print"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                !logosLocked && (
+                  <label className="cursor-pointer no-print">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleLogoUpload(e, setContractorLogo)}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-200 rounded hover:bg-gray-300">
+                      <Upload size={16} />
+                      Upload
+                    </div>
+                  </label>
+                )
+              )}
+            </div>
+
+            <div className="border-r-2 border-gray-800 p-4 flex flex-col items-center justify-center">
+              <div className="text-sm font-semibold mb-2">Third Party Company Logo</div>
+              {thirdPartyLogo ? (
+                <div className="relative">
+                  <img src={thirdPartyLogo} alt="Third Party" className="h-20 object-contain" />
+                  {!logosLocked && (
+                    <button
+                      onClick={() => setThirdPartyLogo(null)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 no-print"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                !logosLocked && (
+                  <label className="cursor-pointer no-print">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleLogoUpload(e, setThirdPartyLogo)}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-200 rounded hover:bg-gray-300">
+                      <Upload size={16} />
+                      Upload
+                    </div>
+                  </label>
+                )
+              )}
+            </div>
+
+            <div className="col-span-2 border-l-2 border-gray-800 p-4 flex flex-col items-center justify-center">
+              <div className="text-sm font-semibold mb-2">Principal Employer Logo</div>
+              {principalLogo ? (
+                <div className="relative">
+                  <img src={principalLogo} alt="Principal" className="h-20 object-contain" />
+                  {!logosLocked && (
+                    <button
+                      onClick={() => setPrincipalLogo(null)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 no-print"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                !logosLocked && (
+                  <label className="cursor-pointer no-print">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleLogoUpload(e, setPrincipalLogo)}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-200 rounded hover:bg-gray-300">
+                      <Upload size={16} />
+                      Upload
+                    </div>
+                  </label>
+                )
+              )}
+            </div>
+          </div>
+
+          {/* Project Name and Summary */}
+          <div className="border-2 border-t-0 border-gray-800 p-4 mb-0">
+            <div className="grid grid-cols-4 gap-4 mb-3">
+              <div className="col-span-4 border-b border-gray-400 pb-2">
+                <label className="font-semibold block mb-1">Project Name</label>
+                <input
+                  type="text"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="w-full px-2 py-1 border border-gray-300 rounded"
+                  placeholder="Enter project name"
+                />
+              </div>
+            </div>
+            <div className="mb-3">
+              <label className="font-semibold block mb-1">
+                Any Summary (Capital Letters Only)
+              </label>
+              <input
+                type="text"
+                value={summary}
+                onChange={(e) => setSummary(e.target.value.toUpperCase())}
+                className="w-full px-2 py-1 border border-gray-300 rounded uppercase"
+                placeholder="ENTER SUMMARY IN CAPITALS"
+              />
+            </div>
+            <div className="grid grid-cols-4 gap-4">
+              <div>
+                <label className="font-semibold block mb-1">Date</label>
+                <input
+                  type="text"
+                  value={changeableDate}
+                  onChange={(e) => setChangeableDate(e.target.value)}
+                  className="w-full px-2 py-1 border border-gray-300 rounded"
+                  placeholder="Changeable"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Data Rows */}
+          <div className="border-2 border-t-0 border-gray-800">
+            <div className="grid grid-cols-12 gap-0 bg-gray-100 border-b-2 border-gray-800 font-semibold">
+              <div className="col-span-2 p-3 border-r border-gray-400">Name</div>
+              <div className="col-span-2 p-3 border-r border-gray-400">Sub Contractor</div>
+              <div className="col-span-2 p-3 border-r border-gray-400">Photo</div>
+              <div className="col-span-2 p-3 border-r border-gray-400">Sign</div>
+              <div className="col-span-3 p-3 border-r border-gray-400">Remarks</div>
+              <div className="col-span-1 p-3 no-print">Actions</div>
+            </div>
+
+            {rows.map((row) => (
+              <div key={row.id} className="grid grid-cols-12 gap-0 border-b border-gray-400">
+                <div className="col-span-2 p-2 border-r border-gray-400">
+                  <input
+                    type="text"
+                    value={row.name}
+                    onChange={(e) => updateRow(row.id, 'name', e.target.value)}
+                    className="w-full px-2 py-1 border border-gray-300 rounded"
+                  />
+                </div>
+                <div className="col-span-2 p-2 border-r border-gray-400">
+                  <input
+                    type="text"
+                    value={row.subContractor}
+                    onChange={(e) => updateRow(row.id, 'subContractor', e.target.value)}
+                    className="w-full px-2 py-1 border border-gray-300 rounded"
+                  />
+                </div>
+                <div className="col-span-2 p-2 border-r border-gray-400">
+                  {row.photo ? (
+                    <img src={row.photo} alt="Photo" className="h-12 object-contain" />
+                  ) : (
+                    <label className="cursor-pointer no-print">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleFileUpload(row.id, 'photo', e)}
+                        className="hidden"
+                      />
+                      <div className="text-sm text-blue-600 hover:text-blue-800">Upload Photo</div>
+                    </label>
+                  )}
+                </div>
+                <div className="col-span-2 p-2 border-r border-gray-400">
+                  {row.sign ? (
+                    <img src={row.sign} alt="Sign" className="h-12 object-contain" />
+                  ) : (
+                    <label className="cursor-pointer no-print">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleFileUpload(row.id, 'sign', e)}
+                        className="hidden"
+                      />
+                      <div className="text-sm text-blue-600 hover:text-blue-800">Upload Sign</div>
+                    </label>
+                  )}
+                </div>
+                <div className="col-span-3 p-2 border-r border-gray-400">
+                  <input
+                    type="text"
+                    value={row.remarks}
+                    onChange={(e) => updateRow(row.id, 'remarks', e.target.value)}
+                    className="w-full px-2 py-1 border border-gray-300 rounded"
+                  />
+                </div>
+                <div className="col-span-1 p-2 flex items-center justify-center no-print">
+                  <button
+                    onClick={() => deleteRow(row.id)}
+                    className="text-red-600 hover:text-red-800"
+                    disabled={rows.length === 1}
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={addRow}
+          className="mt-4 flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 no-print"
+        >
+          <Plus size={18} />
+          Add New Row
+        </button>
+
+        {/* HSE Officer Section */}
+        <div className="mt-6 border-2 border-gray-800">
+          <div className="grid grid-cols-12 gap-0">
+            <div className="col-span-3 p-3 border-r border-gray-400 bg-gray-100 font-semibold flex items-center">
+              HSE Officer Name
+            </div>
+            <div className="col-span-3 p-3 border-r border-gray-400">
+              <input
+                type="text"
+                value={hseOfficer}
+                onChange={(e) => setHseOfficer(e.target.value)}
+                className="w-full px-2 py-1 border border-gray-300 rounded"
+                placeholder="Enter HSE Officer Name"
+              />
+            </div>
+            <div className="col-span-2 p-3 border-r border-gray-400 bg-gray-100 font-semibold flex items-center">
+              Photo
+            </div>
+            <div className="col-span-2 p-3 border-r border-gray-400">
+              {hsePhoto ? (
+                <div className="relative">
+                  <img src={hsePhoto} alt="HSE Photo" className="h-16 object-contain" />
+                  <button
+                    onClick={() => setHsePhoto(null)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 no-print"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <label className="cursor-pointer no-print">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => setHsePhoto(event.target.result);
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <div className="text-sm text-blue-600 hover:text-blue-800">Upload Photo</div>
+                </label>
+              )}
+            </div>
+            <div className="col-span-2 p-3 bg-gray-100 font-semibold flex items-center">
+              Signature
+            </div>
+          </div>
+          <div className="grid grid-cols-12 gap-0 border-t border-gray-400">
+            <div className="col-span-10 p-3 border-r border-gray-400">
+            </div>
+            <div className="col-span-2 p-3">
+              {hseSignature ? (
+                <div className="relative">
+                  <img src={hseSignature} alt="HSE Signature" className="h-16 object-contain" />
+                  <button
+                    onClick={() => setHseSignature(null)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 no-print"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <label className="cursor-pointer no-print">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => setHseSignature(event.target.result);
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <div className="text-sm text-blue-600 hover:text-blue-800">Upload Signature</div>
+                </label>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ContractorReportForm;
