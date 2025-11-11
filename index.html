@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Download, Upload, Lock, Unlock, Plus, Trash2, X, FileUp } from 'lucide-react';
-import * as XLSX from 'xlsx';
 
 const ContractorReportForm = () => {
   const fileInputRef = useRef(null);
@@ -21,7 +20,6 @@ const ContractorReportForm = () => {
   const [hsePhoto, setHsePhoto] = useState(null);
   const [hseSignature, setHseSignature] = useState(null);
 
-  // Load saved logos and lock state on mount
   useEffect(() => {
     loadSavedData();
   }, []);
@@ -112,44 +110,35 @@ const ContractorReportForm = () => {
   };
 
   const exportToExcel = () => {
-    const data = [
-      ['Contractor Logo', 'Third Party Company Logo', '', 'Principal Employer Logo'],
-      ['', 'Project Name', '', ''],
-      ['', projectName, '', ''],
-      ['', summary.toUpperCase(), '', ''],
-      ['Date', changeableDate, '', ''],
-      [],
-      ['Date', 'Name', 'Sub Contractor', 'Photo', 'Sign', 'Remarks']
-    ];
-
+    // Create a simple CSV format that Excel can open
+    let csvContent = "data:text/csv;charset=utf-8,";
+    
+    // Header rows
+    csvContent += "Contractor Logo,Third Party Company Logo,,Principal Employer Logo\n";
+    csvContent += ",Project Name,,\n";
+    csvContent += "," + projectName + ",,\n";
+    csvContent += "," + summary.toUpperCase() + ",,\n";
+    csvContent += "Date," + changeableDate + ",,\n";
+    csvContent += "\n";
+    csvContent += "Date,Name,Sub Contractor,Photo,Sign,Remarks\n";
+    
+    // Data rows
     rows.forEach(row => {
-      data.push([
-        row.date,
-        row.name,
-        row.subContractor,
-        row.photo ? 'Photo Attached' : '',
-        row.sign ? 'Sign Attached' : '',
-        row.remarks
-      ]);
+      csvContent += `${row.date},${row.name},${row.subContractor},${row.photo ? 'Photo Attached' : ''},${row.sign ? 'Sign Attached' : ''},${row.remarks}\n`;
     });
     
-    data.push([]);
-    data.push(['HSE Officer Name', hseOfficer, 'Photo', hsePhoto ? 'Photo Attached' : '', 'Signature', hseSignature ? 'Signature Attached' : '']);
-
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Contractor Report');
+    // HSE Officer
+    csvContent += "\n";
+    csvContent += `HSE Officer Name,${hseOfficer},Photo,${hsePhoto ? 'Photo Attached' : ''},Signature,${hseSignature ? 'Signature Attached' : ''}\n`;
     
-    ws['!cols'] = [
-      { wch: 15 },
-      { wch: 20 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 20 }
-    ];
-
-    XLSX.writeFile(wb, 'contractor_report.xlsx');
+    // Create download link
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "contractor_report.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const importFromExcel = (e) => {
@@ -159,52 +148,63 @@ const ContractorReportForm = () => {
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const data = new Uint8Array(event.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-        // Parse data rows only (starting from row index 7)
+        const text = event.target.result;
+        const lines = text.split('\n');
+        
         const newRows = [];
         let rowId = 1;
+        let foundDataHeader = false;
         
-        for (let i = 7; i < jsonData.length; i++) {
-          const row = jsonData[i];
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
           
-          // Check if this is the HSE Officer row - stop here
-          if (row[0] === 'HSE Officer Name') {
-            break;
+          // Find the data header row
+          if (line.startsWith('Date,Name,Sub Contractor')) {
+            foundDataHeader = true;
+            continue;
           }
           
-          // Skip empty rows
-          if (!row || row.every(cell => !cell)) continue;
-          
-          newRows.push({
-            id: rowId++,
-            date: row[0] || '',
-            name: row[1] || '',
-            subContractor: row[2] || '',
-            photo: null,
-            sign: null,
-            remarks: row[5] || ''
-          });
+          // Start parsing data rows after header
+          if (foundDataHeader) {
+            // Stop at HSE Officer row
+            if (line.startsWith('HSE Officer Name')) {
+              break;
+            }
+            
+            // Skip empty lines
+            if (!line) continue;
+            
+            const columns = line.split(',');
+            
+            // Skip if all columns are empty
+            if (columns.every(col => !col || !col.trim())) continue;
+            
+            newRows.push({
+              id: rowId++,
+              date: columns[0] || '',
+              name: columns[1] || '',
+              subContractor: columns[2] || '',
+              photo: null,
+              sign: null,
+              remarks: columns[5] || ''
+            });
+          }
         }
 
         if (newRows.length > 0) {
           setRows(newRows);
-          alert(`Successfully imported ${newRows.length} row(s) from Excel.`);
+          alert(`Successfully imported ${newRows.length} row(s) from file.`);
         } else {
-          alert('No data rows found in the Excel file.');
+          alert('No data rows found in the file.');
         }
       } catch (error) {
-        console.error('Error importing Excel:', error);
-        alert('Error importing Excel file. Please make sure the format is correct.');
+        console.error('Error importing file:', error);
+        alert('Error importing file. Please make sure it is a CSV/Excel file with the correct format.');
       }
     };
 
-    reader.readAsArrayBuffer(file);
+    reader.readAsText(file);
     
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -234,11 +234,11 @@ const ContractorReportForm = () => {
             </button>
             <label className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 cursor-pointer">
               <FileUp size={18} />
-              Import Excel
+              Import
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".csv,.xlsx,.xls"
                 onChange={importFromExcel}
                 className="hidden"
               />
@@ -248,7 +248,7 @@ const ContractorReportForm = () => {
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
             >
               <Download size={18} />
-              Excel
+              Export CSV
             </button>
             <button
               onClick={exportToPDF}
@@ -261,7 +261,6 @@ const ContractorReportForm = () => {
         </div>
 
         <div id="printable-area">
-          {/* Logo Section */}
           <div className="grid grid-cols-4 gap-4 mb-6 border-2 border-gray-800">
             <div className="border-r-2 border-gray-800 p-4 flex flex-col items-center justify-center min-h-32">
               <div className="text-sm font-semibold mb-2">Contractor Logo</div>
@@ -360,7 +359,6 @@ const ContractorReportForm = () => {
             </div>
           </div>
 
-          {/* Project Name and Summary */}
           <div className="border-2 border-t-0 border-gray-800 p-4 mb-0">
             <div className="grid grid-cols-4 gap-4 mb-3">
               <div className="col-span-4 border-b border-gray-400 pb-2">
@@ -400,7 +398,6 @@ const ContractorReportForm = () => {
             </div>
           </div>
 
-          {/* Data Rows */}
           <div className="border-2 border-t-0 border-gray-800">
             <div className="grid grid-cols-12 gap-0 bg-gray-100 border-b-2 border-gray-800 font-semibold">
               <div className="col-span-2 p-3 border-r border-gray-400">Name</div>
@@ -489,7 +486,6 @@ const ContractorReportForm = () => {
           Add New Row
         </button>
 
-        {/* HSE Officer Section */}
         <div className="mt-6 border-2 border-gray-800">
           <div className="grid grid-cols-12 gap-0">
             <div className="col-span-3 p-3 border-r border-gray-400 bg-gray-100 font-semibold flex items-center">
