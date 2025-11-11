@@ -1,580 +1,732 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Download, Upload, Lock, Unlock, Plus, Trash2, X, FileUp } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contractor Report Manager</title>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-const ContractorReportForm = () => {
-  const fileInputRef = useRef(null);
-  const [contractorLogo, setContractorLogo] = useState(null);
-  const [thirdPartyLogo, setThirdPartyLogo] = useState(null);
-  const [principalLogo, setPrincipalLogo] = useState(null);
-  const [logosLocked, setLogosLocked] = useState(false);
-  
-  const [projectName, setProjectName] = useState('');
-  const [summary, setSummary] = useState('');
-  const [changeableDate, setChangeableDate] = useState('');
-  
-  const [rows, setRows] = useState([
-    { id: 1, date: '', name: '', subContractor: '', photo: null, sign: null, remarks: '' }
-  ]);
-  
-  const [hseOfficer, setHseOfficer] = useState('');
-  const [hsePhoto, setHsePhoto] = useState(null);
-  const [hseSignature, setHseSignature] = useState(null);
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      background-color: #f9fafb;
+      min-height: 100vh;
+    }
 
-  useEffect(() => {
-    loadSavedData();
-  }, []);
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
 
-  const loadSavedData = async () => {
-    try {
-      const logoData = await window.storage.get('contractor-logos');
-      if (logoData) {
-        const data = JSON.parse(logoData.value);
-        setContractorLogo(data.contractor);
-        setThirdPartyLogo(data.thirdParty);
-        setPrincipalLogo(data.principal);
-        setLogosLocked(data.locked || false);
+    .card {
+      background: white;
+      border-radius: 0.5rem;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .header h1 {
+      font-size: 1.875rem;
+      font-weight: bold;
+      color: #1f2937;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: white;
+    }
+
+    .btn:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-blue { background-color: #2563eb; }
+    .btn-purple { background-color: #7c3aed; }
+    .btn-green { background-color: #16a34a; }
+    .btn-red { background-color: #dc2626; }
+    .btn-indigo { background-color: #4f46e5; }
+    .btn-gray { background-color: #6b7280; }
+
+    .logo-section {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 2px solid #1f2937;
+      margin-bottom: 1.5rem;
+    }
+
+    .logo-box {
+      border-right: 2px solid #1f2937;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 128px;
+    }
+
+    .logo-box:last-child {
+      border-right: none;
+      grid-column: span 2;
+    }
+
+    .logo-box label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: #374151;
+    }
+
+    .logo-box img {
+      max-height: 80px;
+      object-fit: contain;
+    }
+
+    .upload-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background-color: #e5e7eb;
+      border-radius: 0.375rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+
+    .upload-btn:hover {
+      background-color: #d1d5db;
+    }
+
+    .form-section {
+      border: 2px solid #1f2937;
+      border-top: none;
+      padding: 1rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+      color: #374151;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .data-table {
+      border: 2px solid #1f2937;
+      border-top: none;
+      overflow-x: auto;
+    }
+
+    .table-header {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      background-color: #f3f4f6;
+      border-bottom: 2px solid #1f2937;
+      font-weight: 600;
+    }
+
+    .table-header > div,
+    .table-row > div {
+      padding: 0.75rem;
+      border-right: 1px solid #9ca3af;
+    }
+
+    .table-header > div:last-child,
+    .table-row > div:last-child {
+      border-right: none;
+    }
+
+    .table-row {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      border-bottom: 1px solid #9ca3af;
+    }
+
+    .col-2 { grid-column: span 2; }
+    .col-3 { grid-column: span 3; }
+    .col-1 { grid-column: span 1; }
+
+    .table-row input {
+      width: 100%;
+      padding: 0.25rem 0.5rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.375rem;
+    }
+
+    .upload-link {
+      color: #2563eb;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+
+    .upload-link:hover {
+      color: #1d4ed8;
+    }
+
+    .delete-btn {
+      color: #dc2626;
+      cursor: pointer;
+      border: none;
+      background: none;
+      padding: 0.25rem;
+    }
+
+    .delete-btn:hover {
+      color: #991b1b;
+    }
+
+    .hse-section {
+      border: 2px solid #1f2937;
+      margin-top: 1.5rem;
+    }
+
+    .hse-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+    }
+
+    .hse-grid > div {
+      padding: 0.75rem;
+      border-right: 1px solid #9ca3af;
+      display: flex;
+      align-items: center;
+    }
+
+    .hse-grid > div:last-child {
+      border-right: none;
+    }
+
+    .bg-gray {
+      background-color: #f3f4f6;
+      font-weight: 600;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .relative {
+      position: relative;
+    }
+
+    .delete-img-btn {
+      position: absolute;
+      top: -0.5rem;
+      right: -0.5rem;
+      background-color: #ef4444;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 1.5rem;
+      height: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    @media print {
+      body * {
+        visibility: hidden;
       }
-    } catch (error) {
-      console.log('No saved logos found');
-    }
-  };
-
-  const saveLockState = async (locked, contractor, thirdParty, principal) => {
-    try {
-      await window.storage.set('contractor-logos', JSON.stringify({
-        contractor: contractor || contractorLogo,
-        thirdParty: thirdParty || thirdPartyLogo,
-        principal: principal || principalLogo,
-        locked
-      }));
-    } catch (error) {
-      console.error('Failed to save logos:', error);
-    }
-  };
-
-  const handleLogoUpload = (e, setLogo) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setLogo(event.target.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const toggleLockLogos = () => {
-    const newLockState = !logosLocked;
-    setLogosLocked(newLockState);
-    saveLockState(newLockState);
-  };
-
-  const addRow = () => {
-    const newId = Math.max(...rows.map(r => r.id), 0) + 1;
-    setRows([...rows, { 
-      id: newId, 
-      date: '', 
-      name: '', 
-      subContractor: '', 
-      photo: null, 
-      sign: null, 
-      remarks: '' 
-    }]);
-  };
-
-  const deleteRow = (id) => {
-    if (rows.length > 1) {
-      setRows(rows.filter(row => row.id !== id));
-    }
-  };
-
-  const updateRow = (id, field, value) => {
-    setRows(rows.map(row => 
-      row.id === id ? { ...row, [field]: value } : row
-    ));
-  };
-
-  const handleFileUpload = (id, field, e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        updateRow(id, field, event.target.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const exportToPDF = () => {
-    window.print();
-  };
-
-  const exportToExcel = () => {
-    // Create a simple CSV format that Excel can open
-    let csvContent = "data:text/csv;charset=utf-8,";
-    
-    // Header rows
-    csvContent += "Contractor Logo,Third Party Company Logo,,Principal Employer Logo\n";
-    csvContent += ",Project Name,,\n";
-    csvContent += "," + projectName + ",,\n";
-    csvContent += "," + summary.toUpperCase() + ",,\n";
-    csvContent += "Date," + changeableDate + ",,\n";
-    csvContent += "\n";
-    csvContent += "Date,Name,Sub Contractor,Photo,Sign,Remarks\n";
-    
-    // Data rows
-    rows.forEach(row => {
-      csvContent += `${row.date},${row.name},${row.subContractor},${row.photo ? 'Photo Attached' : ''},${row.sign ? 'Sign Attached' : ''},${row.remarks}\n`;
-    });
-    
-    // HSE Officer
-    csvContent += "\n";
-    csvContent += `HSE Officer Name,${hseOfficer},Photo,${hsePhoto ? 'Photo Attached' : ''},Signature,${hseSignature ? 'Signature Attached' : ''}\n`;
-    
-    // Create download link
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "contractor_report.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const importFromExcel = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = event.target.result;
-        const lines = text.split('\n');
-        
-        const newRows = [];
-        let rowId = 1;
-        let foundDataHeader = false;
-        
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim();
-          
-          // Find the data header row
-          if (line.startsWith('Date,Name,Sub Contractor')) {
-            foundDataHeader = true;
-            continue;
-          }
-          
-          // Start parsing data rows after header
-          if (foundDataHeader) {
-            // Stop at HSE Officer row
-            if (line.startsWith('HSE Officer Name')) {
-              break;
-            }
-            
-            // Skip empty lines
-            if (!line) continue;
-            
-            const columns = line.split(',');
-            
-            // Skip if all columns are empty
-            if (columns.every(col => !col || !col.trim())) continue;
-            
-            newRows.push({
-              id: rowId++,
-              date: columns[0] || '',
-              name: columns[1] || '',
-              subContractor: columns[2] || '',
-              photo: null,
-              sign: null,
-              remarks: columns[5] || ''
-            });
-          }
-        }
-
-        if (newRows.length > 0) {
-          setRows(newRows);
-          alert(`Successfully imported ${newRows.length} row(s) from file.`);
-        } else {
-          alert('No data rows found in the file.');
-        }
-      } catch (error) {
-        console.error('Error importing file:', error);
-        alert('Error importing file. Please make sure it is a CSV/Excel file with the correct format.');
+      #printable-area, #printable-area * {
+        visibility: visible;
       }
-    };
-
-    reader.readAsText(file);
-    
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      #printable-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      .no-print {
+        display: none !important;
+      }
     }
-  };
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          #printable-area, #printable-area * { visibility: visible; }
-          #printable-area { position: absolute; left: 0; top: 0; width: 100%; }
-          .no-print { display: none !important; }
-        }
-      `}</style>
-      
-      <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-lg p-6">
-        <div className="flex justify-between items-center mb-6 no-print">
-          <h1 className="text-3xl font-bold text-gray-800">Contractor Report Manager</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={toggleLockLogos}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              {logosLocked ? <Lock size={18} /> : <Unlock size={18} />}
-              {logosLocked ? 'Unlock Logos' : 'Lock Logos'}
-            </button>
-            <label className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 cursor-pointer">
-              <FileUp size={18} />
-              Import
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                onChange={importFromExcel}
-                className="hidden"
-              />
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .logo-section {
+        grid-template-columns: 1fr;
+      }
+
+      .logo-box {
+        border-right: none;
+        border-bottom: 2px solid #1f2937;
+      }
+
+      .logo-box:last-child {
+        grid-column: span 1;
+        border-bottom: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card no-print">
+      <div class="header">
+        <h1>Contractor Report Manager</h1>
+        <div class="button-group">
+          <button class="btn btn-blue" onclick="toggleLockLogos()">
+            <i data-lucide="lock" style="width: 18px; height: 18px;"></i>
+            <span id="lockText">Lock Logos</span>
+          </button>
+          <label class="btn btn-purple" style="margin: 0;">
+            <i data-lucide="file-up" style="width: 18px; height: 18px;"></i>
+            Import Excel
+            <input type="file" accept=".xlsx,.xls" onchange="importFromExcel(event)" class="hidden">
+          </label>
+          <button class="btn btn-green" onclick="exportToExcel()">
+            <i data-lucide="download" style="width: 18px; height: 18px;"></i>
+            Excel
+          </button>
+          <button class="btn btn-red" onclick="window.print()">
+            <i data-lucide="download" style="width: 18px; height: 18px;"></i>
+            PDF
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="printable-area">
+      <!-- Logo Section -->
+      <div class="logo-section">
+        <div class="logo-box">
+          <label>Contractor Logo</label>
+          <div id="contractorLogoContainer"></div>
+          <label class="upload-btn" id="contractorUploadBtn">
+            <i data-lucide="upload" style="width: 16px; height: 16px;"></i>
+            Upload
+            <input type="file" accept="image/*" onchange="handleLogoUpload(event, 'contractor')" class="hidden">
+          </label>
+        </div>
+        <div class="logo-box">
+          <label>Third Party Company Logo</label>
+          <div id="thirdPartyLogoContainer"></div>
+          <label class="upload-btn" id="thirdPartyUploadBtn">
+            <i data-lucide="upload" style="width: 16px; height: 16px;"></i>
+            Upload
+            <input type="file" accept="image/*" onchange="handleLogoUpload(event, 'thirdParty')" class="hidden">
+          </label>
+        </div>
+        <div class="logo-box">
+          <label>Principal Employer Logo</label>
+          <div id="principalLogoContainer"></div>
+          <label class="upload-btn" id="principalUploadBtn">
+            <i data-lucide="upload" style="width: 16px; height: 16px;"></i>
+            Upload
+            <input type="file" accept="image/*" onchange="handleLogoUpload(event, 'principal')" class="hidden">
+          </label>
+        </div>
+      </div>
+
+      <!-- Project Details -->
+      <div class="form-section">
+        <div class="form-group">
+          <label>Project Name</label>
+          <input type="text" id="projectName" class="form-input" placeholder="Enter project name">
+        </div>
+        <div class="form-group">
+          <label>Any Summary (Capital Letters Only)</label>
+          <input type="text" id="summary" class="form-input" placeholder="ENTER SUMMARY IN CAPITALS" style="text-transform: uppercase;">
+        </div>
+        <div class="form-group" style="max-width: 300px;">
+          <label>Date</label>
+          <input type="text" id="changeableDate" class="form-input" placeholder="Changeable">
+        </div>
+      </div>
+
+      <!-- Data Table -->
+      <div class="data-table">
+        <div class="table-header">
+          <div class="col-2">Name</div>
+          <div class="col-2">Sub Contractor</div>
+          <div class="col-2">Photo</div>
+          <div class="col-2">Sign</div>
+          <div class="col-3">Remarks</div>
+          <div class="col-1 no-print">Actions</div>
+        </div>
+        <div id="dataRows"></div>
+      </div>
+
+      <button class="btn btn-indigo no-print" onclick="addRow()" style="margin-top: 1rem;">
+        <i data-lucide="plus" style="width: 18px; height: 18px;"></i>
+        Add New Row
+      </button>
+
+      <!-- HSE Officer Section -->
+      <div class="hse-section">
+        <div class="hse-grid">
+          <div class="col-3 bg-gray">HSE Officer Name</div>
+          <div class="col-3">
+            <input type="text" id="hseOfficer" class="form-input" placeholder="Enter HSE Officer Name">
+          </div>
+          <div class="col-2 bg-gray">Photo</div>
+          <div class="col-2" id="hsePhotoContainer">
+            <label class="upload-link no-print" id="hsePhotoUploadBtn">
+              Upload Photo
+              <input type="file" accept="image/*" onchange="handleHSEUpload(event, 'photo')" class="hidden">
             </label>
-            <button
-              onClick={exportToExcel}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            >
-              <Download size={18} />
-              Export CSV
-            </button>
-            <button
-              onClick={exportToPDF}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              <Download size={18} />
-              PDF
-            </button>
           </div>
+          <div class="col-2 bg-gray">Signature</div>
         </div>
-
-        <div id="printable-area">
-          <div className="grid grid-cols-4 gap-4 mb-6 border-2 border-gray-800">
-            <div className="border-r-2 border-gray-800 p-4 flex flex-col items-center justify-center min-h-32">
-              <div className="text-sm font-semibold mb-2">Contractor Logo</div>
-              {contractorLogo ? (
-                <div className="relative">
-                  <img src={contractorLogo} alt="Contractor" className="h-20 object-contain" />
-                  {!logosLocked && (
-                    <button
-                      onClick={() => setContractorLogo(null)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 no-print"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-              ) : (
-                !logosLocked && (
-                  <label className="cursor-pointer no-print">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleLogoUpload(e, setContractorLogo)}
-                      className="hidden"
-                    />
-                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-200 rounded hover:bg-gray-300">
-                      <Upload size={16} />
-                      Upload
-                    </div>
-                  </label>
-                )
-              )}
-            </div>
-
-            <div className="border-r-2 border-gray-800 p-4 flex flex-col items-center justify-center">
-              <div className="text-sm font-semibold mb-2">Third Party Company Logo</div>
-              {thirdPartyLogo ? (
-                <div className="relative">
-                  <img src={thirdPartyLogo} alt="Third Party" className="h-20 object-contain" />
-                  {!logosLocked && (
-                    <button
-                      onClick={() => setThirdPartyLogo(null)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 no-print"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-              ) : (
-                !logosLocked && (
-                  <label className="cursor-pointer no-print">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleLogoUpload(e, setThirdPartyLogo)}
-                      className="hidden"
-                    />
-                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-200 rounded hover:bg-gray-300">
-                      <Upload size={16} />
-                      Upload
-                    </div>
-                  </label>
-                )
-              )}
-            </div>
-
-            <div className="col-span-2 border-l-2 border-gray-800 p-4 flex flex-col items-center justify-center">
-              <div className="text-sm font-semibold mb-2">Principal Employer Logo</div>
-              {principalLogo ? (
-                <div className="relative">
-                  <img src={principalLogo} alt="Principal" className="h-20 object-contain" />
-                  {!logosLocked && (
-                    <button
-                      onClick={() => setPrincipalLogo(null)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 no-print"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-              ) : (
-                !logosLocked && (
-                  <label className="cursor-pointer no-print">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleLogoUpload(e, setPrincipalLogo)}
-                      className="hidden"
-                    />
-                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-200 rounded hover:bg-gray-300">
-                      <Upload size={16} />
-                      Upload
-                    </div>
-                  </label>
-                )
-              )}
-            </div>
-          </div>
-
-          <div className="border-2 border-t-0 border-gray-800 p-4 mb-0">
-            <div className="grid grid-cols-4 gap-4 mb-3">
-              <div className="col-span-4 border-b border-gray-400 pb-2">
-                <label className="font-semibold block mb-1">Project Name</label>
-                <input
-                  type="text"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  className="w-full px-2 py-1 border border-gray-300 rounded"
-                  placeholder="Enter project name"
-                />
-              </div>
-            </div>
-            <div className="mb-3">
-              <label className="font-semibold block mb-1">
-                Any Summary (Capital Letters Only)
-              </label>
-              <input
-                type="text"
-                value={summary}
-                onChange={(e) => setSummary(e.target.value.toUpperCase())}
-                className="w-full px-2 py-1 border border-gray-300 rounded uppercase"
-                placeholder="ENTER SUMMARY IN CAPITALS"
-              />
-            </div>
-            <div className="grid grid-cols-4 gap-4">
-              <div>
-                <label className="font-semibold block mb-1">Date</label>
-                <input
-                  type="text"
-                  value={changeableDate}
-                  onChange={(e) => setChangeableDate(e.target.value)}
-                  className="w-full px-2 py-1 border border-gray-300 rounded"
-                  placeholder="Changeable"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="border-2 border-t-0 border-gray-800">
-            <div className="grid grid-cols-12 gap-0 bg-gray-100 border-b-2 border-gray-800 font-semibold">
-              <div className="col-span-2 p-3 border-r border-gray-400">Name</div>
-              <div className="col-span-2 p-3 border-r border-gray-400">Sub Contractor</div>
-              <div className="col-span-2 p-3 border-r border-gray-400">Photo</div>
-              <div className="col-span-2 p-3 border-r border-gray-400">Sign</div>
-              <div className="col-span-3 p-3 border-r border-gray-400">Remarks</div>
-              <div className="col-span-1 p-3 no-print">Actions</div>
-            </div>
-
-            {rows.map((row) => (
-              <div key={row.id} className="grid grid-cols-12 gap-0 border-b border-gray-400">
-                <div className="col-span-2 p-2 border-r border-gray-400">
-                  <input
-                    type="text"
-                    value={row.name}
-                    onChange={(e) => updateRow(row.id, 'name', e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded"
-                  />
-                </div>
-                <div className="col-span-2 p-2 border-r border-gray-400">
-                  <input
-                    type="text"
-                    value={row.subContractor}
-                    onChange={(e) => updateRow(row.id, 'subContractor', e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded"
-                  />
-                </div>
-                <div className="col-span-2 p-2 border-r border-gray-400">
-                  {row.photo ? (
-                    <img src={row.photo} alt="Photo" className="h-12 object-contain" />
-                  ) : (
-                    <label className="cursor-pointer no-print">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleFileUpload(row.id, 'photo', e)}
-                        className="hidden"
-                      />
-                      <div className="text-sm text-blue-600 hover:text-blue-800">Upload Photo</div>
-                    </label>
-                  )}
-                </div>
-                <div className="col-span-2 p-2 border-r border-gray-400">
-                  {row.sign ? (
-                    <img src={row.sign} alt="Sign" className="h-12 object-contain" />
-                  ) : (
-                    <label className="cursor-pointer no-print">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleFileUpload(row.id, 'sign', e)}
-                        className="hidden"
-                      />
-                      <div className="text-sm text-blue-600 hover:text-blue-800">Upload Sign</div>
-                    </label>
-                  )}
-                </div>
-                <div className="col-span-3 p-2 border-r border-gray-400">
-                  <input
-                    type="text"
-                    value={row.remarks}
-                    onChange={(e) => updateRow(row.id, 'remarks', e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded"
-                  />
-                </div>
-                <div className="col-span-1 p-2 flex items-center justify-center no-print">
-                  <button
-                    onClick={() => deleteRow(row.id)}
-                    className="text-red-600 hover:text-red-800"
-                    disabled={rows.length === 1}
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <button
-          onClick={addRow}
-          className="mt-4 flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 no-print"
-        >
-          <Plus size={18} />
-          Add New Row
-        </button>
-
-        <div className="mt-6 border-2 border-gray-800">
-          <div className="grid grid-cols-12 gap-0">
-            <div className="col-span-3 p-3 border-r border-gray-400 bg-gray-100 font-semibold flex items-center">
-              HSE Officer Name
-            </div>
-            <div className="col-span-3 p-3 border-r border-gray-400">
-              <input
-                type="text"
-                value={hseOfficer}
-                onChange={(e) => setHseOfficer(e.target.value)}
-                className="w-full px-2 py-1 border border-gray-300 rounded"
-                placeholder="Enter HSE Officer Name"
-              />
-            </div>
-            <div className="col-span-2 p-3 border-r border-gray-400 bg-gray-100 font-semibold flex items-center">
-              Photo
-            </div>
-            <div className="col-span-2 p-3 border-r border-gray-400">
-              {hsePhoto ? (
-                <div className="relative">
-                  <img src={hsePhoto} alt="HSE Photo" className="h-16 object-contain" />
-                  <button
-                    onClick={() => setHsePhoto(null)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 no-print"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : (
-                <label className="cursor-pointer no-print">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => setHsePhoto(event.target.result);
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    className="hidden"
-                  />
-                  <div className="text-sm text-blue-600 hover:text-blue-800">Upload Photo</div>
-                </label>
-              )}
-            </div>
-            <div className="col-span-2 p-3 bg-gray-100 font-semibold flex items-center">
-              Signature
-            </div>
-          </div>
-          <div className="grid grid-cols-12 gap-0 border-t border-gray-400">
-            <div className="col-span-10 p-3 border-r border-gray-400">
-            </div>
-            <div className="col-span-2 p-3">
-              {hseSignature ? (
-                <div className="relative">
-                  <img src={hseSignature} alt="HSE Signature" className="h-16 object-contain" />
-                  <button
-                    onClick={() => setHseSignature(null)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 no-print"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : (
-                <label className="cursor-pointer no-print">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => setHseSignature(event.target.result);
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    className="hidden"
-                  />
-                  <div className="text-sm text-blue-600 hover:text-blue-800">Upload Signature</div>
-                </label>
-              )}
-            </div>
+        <div class="hse-grid" style="border-top: 1px solid #9ca3af;">
+          <div class="col-10"></div>
+          <div class="col-2" id="hseSignatureContainer">
+            <label class="upload-link no-print" id="hseSignatureUploadBtn">
+              Upload Signature
+              <input type="file" accept="image/*" onchange="handleHSEUpload(event, 'signature')" class="hidden">
+            </label>
           </div>
         </div>
       </div>
     </div>
-  );
-};
+  </div>
 
-export default ContractorReportForm;
+  <script>
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    // Global state
+    let state = {
+      contractorLogo: null,
+      thirdPartyLogo: null,
+      principalLogo: null,
+      logosLocked: false,
+      rows: []
+    };
+    let rowIdCounter = 0;
+
+    // Load saved data
+    function loadSavedData() {
+      try {
+        const saved = localStorage.getItem('contractor-logos');
+        if (saved) {
+          const data = JSON.parse(saved);
+          state.contractorLogo = data.contractor;
+          state.thirdPartyLogo = data.thirdParty;
+          state.principalLogo = data.principal;
+          state.logosLocked = data.locked || false;
+
+          if (state.contractorLogo) displayLogo('contractor', state.contractorLogo);
+          if (state.thirdPartyLogo) displayLogo('thirdParty', state.thirdPartyLogo);
+          if (state.principalLogo) displayLogo('principal', state.principalLogo);
+          if (state.logosLocked) toggleLockLogos();
+        }
+      } catch (e) {
+        console.log('No saved data');
+      }
+    }
+
+    // Save data
+    function saveData() {
+      try {
+        localStorage.setItem('contractor-logos', JSON.stringify({
+          contractor: state.contractorLogo,
+          thirdParty: state.thirdPartyLogo,
+          principal: state.principalLogo,
+          locked: state.logosLocked
+        }));
+      } catch (e) {
+        console.error('Failed to save');
+      }
+    }
+
+    // Handle logo upload
+    function handleLogoUpload(event, type) {
+      if (state.logosLocked) return;
+      
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          state[type + 'Logo'] = e.target.result;
+          displayLogo(type, e.target.result);
+          saveData();
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function displayLogo(type, src) {
+      const container = document.getElementById(type + 'LogoContainer');
+      const uploadBtn = document.getElementById(type + 'UploadBtn');
+      
+      container.innerHTML = `
+        <div class="relative">
+          <img src="${src}" alt="${type}" style="max-height: 80px; object-fit: contain;">
+          <button class="delete-img-btn no-print" onclick="deleteLogo('${type}')">×</button>
+        </div>
+      `;
+      uploadBtn.classList.add('hidden');
+      lucide.createIcons();
+    }
+
+    function deleteLogo(type) {
+      if (state.logosLocked) return;
+      
+      state[type + 'Logo'] = null;
+      document.getElementById(type + 'LogoContainer').innerHTML = '';
+      document.getElementById(type + 'UploadBtn').classList.remove('hidden');
+      saveData();
+    }
+
+    // Toggle logo lock
+    function toggleLockLogos() {
+      state.logosLocked = !state.logosLocked;
+      document.getElementById('lockText').textContent = state.logosLocked ? 'Unlock Logos' : 'Lock Logos';
+      
+      ['contractor', 'thirdParty', 'principal'].forEach(type => {
+        const btn = document.getElementById(type + 'UploadBtn');
+        if (state.logosLocked) {
+          btn.style.display = 'none';
+        } else {
+          if (!state[type + 'Logo']) {
+            btn.style.display = '';
+          }
+        }
+      });
+      
+      saveData();
+      lucide.createIcons();
+    }
+
+    // Add row
+    function addRow() {
+      rowIdCounter++;
+      const rowId = rowIdCounter;
+      const rowsContainer = document.getElementById('dataRows');
+      
+      const row = document.createElement('div');
+      row.className = 'table-row';
+      row.id = 'row-' + rowId;
+      row.innerHTML = `
+        <div class="col-2">
+          <input type="text" data-field="name" placeholder="Name">
+        </div>
+        <div class="col-2">
+          <input type="text" data-field="subContractor" placeholder="Sub Contractor">
+        </div>
+        <div class="col-2" id="photo-${rowId}">
+          <label class="upload-link no-print">
+            Upload Photo
+            <input type="file" accept="image/*" onchange="handleRowFileUpload(event, ${rowId}, 'photo')" class="hidden">
+          </label>
+        </div>
+        <div class="col-2" id="sign-${rowId}">
+          <label class="upload-link no-print">
+            Upload Sign
+            <input type="file" accept="image/*" onchange="handleRowFileUpload(event, ${rowId}, 'sign')" class="hidden">
+          </label>
+        </div>
+        <div class="col-3">
+          <input type="text" data-field="remarks" placeholder="Remarks">
+        </div>
+        <div class="col-1 no-print" style="text-align: center;">
+          <button class="delete-btn" onclick="deleteRow(${rowId})">
+            <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i>
+          </button>
+        </div>
+      `;
+      
+      rowsContainer.appendChild(row);
+      lucide.createIcons();
+    }
+
+    // Delete row
+    function deleteRow(id) {
+      const rowsContainer = document.getElementById('dataRows');
+      if (rowsContainer.children.length > 1) {
+        document.getElementById('row-' + id).remove();
+      } else {
+        alert('At least one row is required');
+      }
+    }
+
+    // Handle row file upload
+    function handleRowFileUpload(event, rowId, field) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const container = document.getElementById(field + '-' + rowId);
+          container.innerHTML = `<img src="${e.target.result}" alt="${field}" style="height: 48px; object-fit: contain;">`;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // Handle HSE upload
+    function handleHSEUpload(event, type) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const container = document.getElementById('hse' + type.charAt(0).toUpperCase() + type.slice(1) + 'Container');
+          const uploadBtn = document.getElementById('hse' + type.charAt(0).toUpperCase() + type.slice(1) + 'UploadBtn');
+          
+          container.innerHTML = `
+            <div class="relative">
+              <img src="${e.target.result}" alt="HSE ${type}" style="max-height: 64px; object-fit: contain;">
+              <button class="delete-img-btn no-print" onclick="deleteHSEImage('${type}')">×</button>
+            </div>
+          `;
+          uploadBtn.classList.add('hidden');
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function deleteHSEImage(type) {
+      const container = document.getElementById('hse' + type.charAt(0).toUpperCase() + type.slice(1) + 'Container');
+      const uploadBtn = document.getElementById('hse' + type.charAt(0).toUpperCase() + type.slice(1) + 'UploadBtn');
+      
+      container.innerHTML = uploadBtn.outerHTML;
+      uploadBtn.classList.remove('hidden');
+    }
+
+    // Export to Excel
+    function exportToExcel() {
+      const data = [
+        ['Contractor Logo', 'Third Party Company Logo', '', 'Principal Employer Logo'],
+        ['', 'Project Name', '', ''],
+        ['', document.getElementById('projectName').value, '', ''],
+        ['', document.getElementById('summary').value.toUpperCase(), '', ''],
+        ['Date', document.getElementById('changeableDate').value, '', ''],
+        [],
+        ['Date', 'Name', 'Sub Contractor', 'Photo', 'Sign', 'Remarks']
+      ];
+
+      const rows = document.getElementById('dataRows').children;
+      for (let row of rows) {
+        const inputs = row.querySelectorAll('input[type="text"]');
+        data.push([
+          document.getElementById('changeableDate').value,
+          inputs[0].value,
+          inputs[1].value,
+          row.querySelector('img[alt="photo"]') ? 'Photo Attached' : '',
+          row.querySelector('img[alt="sign"]') ? 'Sign Attached' : '',
+          inputs[2].value
+        ]);
+      }
+
+      data.push([]);
+      data.push(['HSE Officer Name', document.getElementById('hseOfficer').value, 'Photo', 
+                 document.querySelector('#hsePhotoContainer img') ? 'Photo Attached' : '', 
+                 'Signature', 
+                 document.querySelector('#hseSignatureContainer img') ? 'Signature Attached' : '']);
+
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Contractor Report');
+      
+      ws['!cols'] = [
+        { wch: 15 }, { wch: 20 }, { wch: 15 },
+        { wch: 15 }, { wch: 15 }, { wch: 20 }
+      ];
+
+      XLSX.writeFile(wb, 'contractor_report.xlsx');
+    }
+
+    // Import from Excel
+    function importFromExcel(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+          // Clear existing rows
+          document.getElementById('dataRows').innerHTML = '';
+          rowIdCounter = 0;
+
+          const newRows = [];
+          for (let i = 7; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            if (row[0] === 'HSE Officer Name') break;
+            if (!row || row.every(cell => !cell)) continue;
+            
+            addRow();
+            const rowElement = document.getElementById('row-' + rowIdCounter);
+            const inputs = rowElement.querySelectorAll('input[type="text"]');
+            if (row[1]) inputs[0].value = row[1];
+            if (row[2]) inputs[1].value = row[2];
+            if (row[5]) inputs[2].value = row[5];
+          }
+
+          alert(`Successfully imported rows from Excel.`);
+        } catch (error) {
+          console.error('Error importing Excel:', error);
+          alert('Error importing Excel file. Please make sure the format is correct.');
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+      event.target.value = '';
+    }
+
+    // Initialize
+    window.addEventListener('DOMContentLoaded', function() {
+      loadSavedData();
+      addRow();
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>
